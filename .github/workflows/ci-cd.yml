@@ -1,0 +1,81 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  TERRAFORM_DIR: infra
+  IMAGE_NAME: myorg/ecommerce
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        id: build
+        uses: docker/build-push-action@v4
+        with:
+          context: ./app
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Generate image tag output
+        run: echo "IMAGE_TAG=latest" >> $GITHUB_ENV
+
+  terraform:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+
+      - name: Terraform init
+        working-directory: ./infra
+        run: terraform init -input=false
+
+      - name: Terraform plan
+        working-directory: ./infra
+        env:
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+        run: terraform plan -var="image_tag=${IMAGE_TAG}" -out=tfplan
+
+      - name: Terraform apply
+        if: github.ref == 'refs/heads/main'
+        working-directory: ./infra
+        run: terraform apply -input=false tfplan
+
+      - name: Run DB migrations (optional)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          aws ecs run-task --cluster my-ecom-cluster --task-definition my-migration-task \
+          --launch-type FARGATE --network-configuration "awsvpcConfiguration={subnets=[subnet-...],securityGroups=[sg-...],assignPublicIp=ENABLED}"
+

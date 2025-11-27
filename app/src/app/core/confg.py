@@ -1,0 +1,20 @@
+import os
+
+class Settings:
+    ENV: str = os.getenv("ENV", "staging")
+
+    DB_HOST: str = os.getenv("DB_HOST", "")
+    DB_PORT: int = int(os.getenv("DB_PORT", "5432"))
+    DB_NAME: str = os.getenv("DB_NAME", "")
+    DB_USER: str = os.getenv("DB_USER", "")
+    DB_PASSWORD: str = os.getenv("DB_PASSWORD", "")
+
+    @property
+    def DATABASE_URL(self):
+        return (
+            f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}@"
+            f"{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        )
+
+settings = Settings()
+
