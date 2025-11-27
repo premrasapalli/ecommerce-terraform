@@ -10,6 +10,7 @@ env:
   AWS_REGION: us-east-1
   TERRAFORM_DIR: infra
   IMAGE_NAME: myorg/ecommerce
+  DB_SECRET_NAME: ecommerce-db-credentials   # <-- name of your secret
 
 jobs:
   build-and-push:
@@ -38,21 +39,47 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push image
+      - name: Build & push Docker image
         id: build
         uses: docker/build-push-action@v4
         with:
           context: ./app
           push: true
-          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.IMAGE_NAME }}:latest
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.IMAGE_NAME }}:latest
 
-      - name: Generate image tag output
+      - name: Set IMAGE_TAG
         run: echo "IMAGE_TAG=latest" >> $GITHUB_ENV
+
+      # -------------------------------
+      # 🔐 PUT DB SECRET INTO SECRETS MANAGER
+      # -------------------------------
+      - name: Generate random DB password
+        id: generate
+        run: echo "password=$(openssl rand -base64 18)" >> $GITHUB_OUTPUT
+
+      - name: Create secret if not exists
+        run: |
+          aws secretsmanager create-secret \
+            --name "${{ env.DB_SECRET_NAME }}" \
+            --description "DB credentials for ecommerce app" \
+            --secret-string "{\"username\":\"appuser\",\"password\":\"${{ steps.generate.outputs.password }}\"}" \
+            --region $AWS_REGION || true
+
+      - name: Update DB secret value
+        run: |
+          aws secretsmanager put-secret-value \
+            --secret-id "${{ env.DB_SECRET_NAME }}" \
+            --secret-string "{\"username\":\"appuser\",\"password\":\"${{ steps.generate.outputs.password }}\"}" \
+            --region $AWS_REGION
 
 
   terraform:
     needs: build-and-push
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -77,17 +104,24 @@ jobs:
         working-directory: ./infra
         env:
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
-        run: terraform plan -var="image_tag=${IMAGE_TAG}" -out=tfplan
+          DB_SECRET_NAME: ${{ env.DB_SECRET_NAME }}
+        run: terraform plan \
+          -var="image_tag=${IMAGE_TAG}" \
+          -var="db_secret_name=${DB_SECRET_NAME}" \
+          -out=tfplan
 
       - name: Terraform apply
         if: github.ref == 'refs/heads/main'
         working-directory: ./infra
         run: terraform apply -input=false tfplan
 
-      - name: Run DB migrations (optional)
+      # Optional DB migrations
+      - name: Run DB migrations
         if: github.ref == 'refs/heads/main'
         run: |
-          aws ecs run-task --cluster my-ecom-cluster --task-definition my-migration-task \
-          --launch-type FARGATE \
-          --network-configuration "awsvpcConfiguration={subnets=[subnet-...],securityGroups=[sg-...],assignPublicIp=ENABLED}"
+          aws ecs run-task \
+            --cluster my-ecom-cluster \
+            --task-definition my-migration-task \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[subnet-123],securityGroups=[sg-123],assignPublicIp=ENABLED}"
 
