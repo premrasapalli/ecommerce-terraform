@@ -46,8 +46,4 @@ variable "alb_target_group_arn" {
   description = "ALB target group ARN for ECS service"
   type        = string
 }
-variable "repo_url" {
-  description = "ECR repo URL"
-  type = string
-}
 

@@ -1,6 +1,6 @@
-###############
-# Global Vars #
-###############
+#######################
+# Global / AWS Config #
+#######################
 
 variable "project_name" {
   description = "Name of the application"
@@ -9,58 +9,68 @@ variable "project_name" {
 }
 
 variable "aws_region" {
-  description = "AWS region to deploy resources"
+  description = "AWS region for resources"
   type        = string
   default     = "us-east-1"
 }
 
-##################
-# Networking Vars #
-##################
+variable "environment" {
+  description = "Deployment environment (dev/staging/prod)"
+  type        = string
+  default     = "prod"
+}
+
+
+#################
+# Networking    #
+#################
 
 variable "vpc_cidr" {
-  description = "CIDR block for VPC"
+  description = "CIDR range for VPC"
   type        = string
   default     = "10.0.0.0/16"
 }
 
 variable "azs" {
-  description = "List of Availability Zones"
+  description = "Availability Zones"
   type        = list(string)
   default     = ["us-east-1a", "us-east-1b"]
 }
 
-######################
-# ECS / App Settings #
-######################
+
+############################
+# ECS / App Configuration  #
+############################
 
 variable "task_cpu" {
-  description = "CPU for ECS task"
+  description = "ECS task CPU"
   type        = number
   default     = 512
 }
 
 variable "task_memory" {
-  description = "Memory for ECS task"
+  description = "ECS task memory"
   type        = number
   default     = 1024
 }
 
 variable "desired_count" {
-  description = "Desired number of ECS service tasks"
+  description = "Desired number of ECS tasks"
   type        = number
   default     = 2
 }
 
 variable "image_tag" {
-  description = "Container image tag to deploy"
+  description = "Tag for the Docker image"
   type        = string
   default     = "latest"
 }
 
-###################
-# Database Config #
-###################
+
+
+#################
+# Database Vars #
+#################
 
 variable "db_username" {
   description = "Master username for RDS"
@@ -69,13 +79,20 @@ variable "db_username" {
 }
 
 variable "db_password" {
-  description = "Password for RDS master user"
+  description = "Master DB password (if not using Secrets Manager)"
   type        = string
   sensitive   = true
+  default     = ""
+}
+
+variable "db_secret_arn" {
+  description = "Secrets Manager ARN for DB login JSON"
+  type        = string
+  default     = ""
 }
 
 variable "db_engine_version" {
-  description = "PostgreSQL engine version"
+  description = "PostgreSQL version"
   type        = string
   default     = "15.3"
 }
@@ -87,20 +104,21 @@ variable "db_instance_type" {
 }
 
 variable "db_storage_gb" {
-  description = "Allocated storage for RDS"
+  description = "DB storage size"
   type        = number
   default     = 50
 }
 
 variable "backup_retention" {
-  description = "Number of days to retain RDS backups"
+  description = "Backup retention days"
   type        = number
   default     = 7
 }
 
-#########################
-# Load Balancer & HTTPS #
-#########################
+
+##############################
+# HTTPS / ACM / Route53 Vars #
+##############################
 
 variable "enable_https" {
   description = "Enable HTTPS listener on ALB"
@@ -115,17 +133,35 @@ variable "certificate_arn" {
 }
 
 variable "domain_name" {
-  description = "Custom domain (optional)"
+  description = "Domain name (optional)"
   type        = string
   default     = ""
 }
 
-###################
-# Tags / Metadata #
-###################
+variable "create_route53_records" {
+  description = "Create DNS A/AAAA records for ALB/CloudFront"
+  type        = bool
+  default     = false
+}
+
+
+##############
+# S3 / CDN   #
+##############
+
+variable "enable_cdn" {
+  description = "Enable S3 + CloudFront deployment"
+  type        = bool
+  default     = false
+}
+
+
+###########
+# Tags    #
+###########
 
 variable "tags" {
-  description = "Common tags applied to all resources"
+  description = "Common tags"
   type        = map(string)
   default = {
     project   = "ecommerce"
