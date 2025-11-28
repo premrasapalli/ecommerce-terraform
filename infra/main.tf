@@ -10,10 +10,10 @@ module "rds" {
   source = "./modules/rds"
 
   # Database configuration
-  db_username     = var.db_username
-  db_password     = data.aws_secretsmanager_secret_version.db_secret.secret_string
-  instance_type   = var.db_instance_type
-  private_subnets = module.vpc.private_subnets
+  name       = "ecom-db"
+  vpc_id     = module.vpc.vpc_id
+  subnet_ids = module.vpc.private_subnets
+  tags       = var.tags
 }
 
 module "ecr" {
