@@ -2,6 +2,7 @@ module "vpc" {
   source = "./modules/vpc"
 
   # VPC configuration
+  name   = var.project_name   # or "ecommerce"
   cidr = "10.0.0.0/16"
   azs  = ["us-east-1a", "us-east-1b"]
 }
