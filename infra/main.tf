@@ -27,7 +27,6 @@ module "alb" {
   enable_https    = var.enable_https
   certificate_arn = var.certificate_arn
   domain_name     = var.domain_name
-  public_subnets  = module.vpc.public_subnets
   project_name    = var.project_name
   tags            = var.tags
   vpc_id          = module.vpc.vpc_id
