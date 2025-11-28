@@ -135,6 +135,28 @@ resource "aws_lb_listener" "https_listener" {
 }
 
 ###########################
+# Host-Based Routing (If domain_name provided)
+###########################
+
+resource "aws_lb_listener_rule" "domain_based" {
+  count = var.domain_name != "" && var.enable_https ? 1 : 0
+
+  listener_arn = aws_lb_listener.https_listener[0].arn
+  priority     = 10
+
+  condition {
+    host_header {
+      values = [var.domain_name]
+    }
+  }
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.ecs_tg.arn
+  }
+}
+
+###########################
 # Outputs
 ###########################
 
