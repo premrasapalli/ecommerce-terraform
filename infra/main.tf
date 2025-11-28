@@ -30,6 +30,9 @@ module "alb" {
   public_subnets  = module.vpc.public_subnets
   project_name    = var.project_name
   tags            = var.tags
+  vpc_id          = module.vpc.vpc_id
+  public_subnets  = module.vpc.public_subnets
+  container_port  = 80
 }
 
 module "ecs" {
