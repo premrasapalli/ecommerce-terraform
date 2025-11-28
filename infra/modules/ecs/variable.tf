@@ -7,6 +7,11 @@ variable "name" {
   type        = string
 }
 
+variable "cluster_name" {
+  description = "Name of the ECS cluster"
+  type        = string
+}
+
 variable "task_cpu" {
   description = "CPU units for ECS task"
   type        = number
@@ -45,5 +50,11 @@ variable "security_group_ids" {
 variable "alb_target_group_arn" {
   description = "ALB target group ARN for ECS service"
   type        = string
+}
+
+variable "container_port" {
+  description = "Port the container listens on"
+  type        = number
+  default     = 80
 }
 
