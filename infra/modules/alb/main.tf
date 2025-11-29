@@ -35,7 +35,6 @@ resource "aws_security_group" "alb_sg" {
   }
 
   egress {
-    description = "Allow all outbound traffic"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -56,7 +55,6 @@ resource "aws_lb" "alb" {
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb_sg.id]
   subnets            = var.public_subnets
-  idle_timeout       = 60
 
   tags = merge({
     Name = "${var.project_name}-alb"
@@ -73,14 +71,13 @@ resource "aws_lb_target_group" "ecs_tg" {
   protocol    = "HTTP"
   target_type = "ip"
   vpc_id      = var.vpc_id
-  slow_start  = 30
 
   health_check {
     path                = "/health"
     interval            = 30
     timeout             = 5
-    unhealthy_threshold = 2
     healthy_threshold   = 2
+    unhealthy_threshold = 2
     matcher             = "200-399"
   }
 
@@ -90,26 +87,56 @@ resource "aws_lb_target_group" "ecs_tg" {
 }
 
 ###########################
-# HTTP Listener
+# HTTP Listener (80 → 443 Redirect)
 ###########################
 
 resource "aws_lb_listener" "http_listener" {
   load_balancer_arn = aws_lb.alb.arn
-  port              = "80"
+  port              = 80
   protocol          = "HTTP"
 
   default_action {
     type = var.enable_https ? "redirect" : "forward"
 
-    redirect {
-      protocol   = "HTTPS"
-      port       = "443"
-      status_code = "HTTP_301"
+    # redirect behavior IF https enabled
+    dynamic "redirect" {
+      for_each = var.enable_https ? [1] : []
+      content {
+        protocol   = "HTTPS"
+        port       = "443"
+        status_code = "HTTP_301"
+      }
     }
 
+    # forward behavior IF https disabled
     dynamic "forward" {
       for_each = var.enable_https ? [] : [1]
       content {
+        target_group {
+          target_group_arn = aws_lb_target_group.ecs_tg.arn
+        }
+      }
+    }
+  }
+}
+
+###########################
+# HTTPS Listener
+###########################
+
+resource "aws_lb_listener" "https_listener" {
+  count             = var.enable_https ? 1 : 0
+  load_balancer_arn = aws_lb.alb.arn
+  port              = 443
+  protocol          = "HTTPS"
+  certificate_arn   = var.certificate_arn
+  ssl_policy        = "ELBSecurityPolicy-2016-08"
+
+  default_action {
+    type = "forward"
+
+    forward {
+      target_group {
         target_group_arn = aws_lb_target_group.ecs_tg.arn
       }
     }
@@ -117,32 +144,14 @@ resource "aws_lb_listener" "http_listener" {
 }
 
 ###########################
-# HTTPS Listener (Optional)
-###########################
-
-resource "aws_lb_listener" "https_listener" {
-  count             = var.enable_https ? 1 : 0
-  load_balancer_arn = aws_lb.alb.arn
-  port              = "443"
-  protocol          = "HTTPS"
-  certificate_arn   = var.certificate_arn
-  ssl_policy        = "ELBSecurityPolicy-2016-08"
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.ecs_tg.arn
-  }
-}
-
-###########################
-# Host-Based Routing (If domain_name provided)
+# Host-Based Routing Rule
 ###########################
 
 resource "aws_lb_listener_rule" "domain_based" {
-  count = var.domain_name != "" && var.enable_https ? 1 : 0
+  count = var.enable_https && var.domain_name != "" ? 1 : 0
 
   listener_arn = aws_lb_listener.https_listener[0].arn
-  priority     = 10
+  priority     = 100
 
   condition {
     host_header {
@@ -151,8 +160,12 @@ resource "aws_lb_listener_rule" "domain_based" {
   }
 
   action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.ecs_tg.arn
+    type = "forward"
+    forward {
+      target_group {
+        target_group_arn = aws_lb_target_group.ecs_tg.arn
+      }
+    }
   }
 }
 

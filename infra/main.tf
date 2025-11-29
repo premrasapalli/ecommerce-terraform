@@ -14,6 +14,9 @@ module "rds" {
   name       = "ecom-db"
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
+  db_username   = var.db_username
+  db_password   = var.db_password
+  instance_type = var.instance_type
   tags       = var.tags
 }
 

@@ -100,7 +100,7 @@ variable "db_engine_version" {
 variable "db_instance_type" {
   description = "Instance class for RDS"
   type        = string
-  default     = "db.t3.medium"
+  default     = "db.t3.micro"
 }
 
 variable "db_storage_gb" {
@@ -167,5 +167,10 @@ variable "tags" {
     project   = "ecommerce"
     terraform = "true"
   }
+}
+variable "domain_alternatives" {
+  type        = list(string)
+  default     = []
+  description = "Optional additional domain names for ACM"
 }
 
