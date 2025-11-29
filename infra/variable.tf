@@ -173,4 +173,12 @@ variable "domain_alternatives" {
   default     = []
   description = "Optional additional domain names for ACM"
 }
+#############
+# ecr       #
+#############
+
+variable "ecr_name" {
+  type    = string
+  default = "ecommerce-app"
+}
 

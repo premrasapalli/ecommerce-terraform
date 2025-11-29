@@ -22,6 +22,7 @@ module "rds" {
 
 module "ecr" {
   source = "./modules/ecr"
+  name   = var.ecr_name
 }
 
 module "alb" {
